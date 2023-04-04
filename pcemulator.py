@@ -6,7 +6,7 @@ The way to get the root easier
 """
 class FileSystem(object):
     def __init__(self,homeData):
-        self.home=Folder(homeData,parent=None)
+        self.home=Folder(homeData,None)
 
     # def insert(self,parent,data):
     #     insertNode = Node(data,parent)
@@ -15,8 +15,9 @@ class FileSystem(object):
 
 class Folder(object):
     def __init__(self,name,parent):
-        if parent!=None:
-            parent.children.append(self)
+        self.parent=parent
+        if self.parent!=None:#should only be done when creating a Filesystem with home
+            self.parent.children.append(self)
         self.children=[]
         self.name=name
     def addFolder(self,name):
@@ -32,6 +33,7 @@ class File():
         self.name=name
         self.extension=extension
         self.displayName=name+"."+extension
+        self.data=""
     def __str__(self):
         return self.displayName
 
@@ -78,26 +80,27 @@ class Terminal(object):
         folderContents=""
         lscwd=self.cwd
         searchHidden=False
-        if len(args)>0:
-            if args[0][0:2] =="~/":
-                path = args[0][2:]
-                lsterm = Terminal(self.pc)
-                lsterm.cwd = self.pc.files.root
-                lsterm.cd([path])
-                lscwd=lsterm.cwd
-            else:
-                path=args[0]
-                lsterm = Terminal(self.pc)
-                lsterm.cwd = self.cwd
-                lsterm.cd([path])
-                lscwd=lsterm.cwd
 
+        if len(args)>0:
+            if args[0][0:2] =="~/":#Starting from home
+                path = args[0][2:]
+            else:
+                path=args[0]#starting from cwd
+
+            lsterm = Terminal(self.pc)#seperate terminal so we don't change this terminals cwd
+            lsterm.cwd = self.cwd
+            lsterm.cd([path])
+            lscwd=lsterm.cwd
+
+            #process optional args
             if len(args)>1:
                 for arg in args[1:]:
-                    if arg == "-a":
-                        searchHidden=True
+                    if arg[0]=="-":
+                        pass
                     else:
-                        raise Exception("Unknown Arguement")
+                        raise Exception("That is not a correct argument")
+
+        #different ways to get printable names for Folders and Children
         for child in lscwd.children:
             if isinstance(child,Folder):
                         if child.name[0]==".":
@@ -115,19 +118,28 @@ class Terminal(object):
         return folderContents
     
 
-    def cd(self,args):#This is the one only for the terminal for parser
-        if args==[]:
-            return self.cd(["~"])
-        path=args[0]
-        path=path.split("/")
-        if path[0]=="~":
-            self.cwd=self.pc.files.root
+    def cd(self,args):
+        if len(args)>1:
+            for arg in args[1:]:
+                if arg[0]=="-":
+                    pass
+                else:
+                    raise Exception("That is not a correct argument")
+        if args==[] or args[0][0]=="~":#Throws error if we evaluate args[0][0] if they don't exist, unless we don't evaluate because we end if early
+            self.cwd=self.pc.files.home
         else:
+            path=args[0]
+            path=path.split("/")
             self._innercd(path)
+        
 
-    def _innercd(self,path):#make work with any working directory, so we can use for ls
-        if path ==[]:
+
+    def _innercd(self,path):
+        if path ==[]:#Base case, we went through each part of the path
             return
+        if path[0]=="..":
+            self.cwd=self.cwd.parent
+            return self._innercd(path[1:])
         for child in self.cwd.children:
             if isinstance(child,Folder):
                 if child.name==path[0]:
@@ -135,9 +147,54 @@ class Terminal(object):
                     return self._innercd(path[1:])
             else:
                 pass #child is a file
-        raise Exception("No such file or directory")
+        raise Exception("No such directory")
+    
+
+
+    def touch(self,args):
+        if len(args)>1:
+            for arg in args[1:]:
+                if arg[0]=="-":
+                    pass
+                else:
+                    raise Exception("That is not a correct argument")
+        lastPeriod=arg.rfind(".")
+        self.cwd.addFile(File(arg[:lastPeriod],arg[lastPeriod+1:]))
+
+
+
+    def mkDir(self,args):
+        pass
+
+
+
+
+    def rmDir(self,args):
+        if len(args)>1:
+            for arg in args[1:]:
+                if arg[0]=="-":
+                    pass
+                else:
+                    raise Exception("That is not a correct argument")
+        for child in self.cwd.children:
+            if isinstance(child,Folder):
+                if child.name==args[0]:
+                    self.cwd.children.remove(child)
+            else:
+                pass
+        raise Exception("No such directory")
+
+
+    
         
-    def parseCommand(self,input):
+
+    def rm(self,args):
+        pass
+
+
+
+    
+    def parseCommand(self,input):#TODO TODO TODO process optional args so it can pass through [main arg,[optional args]]
         try:
             input =input.split(' ')
             command = input[0]
@@ -150,8 +207,10 @@ class Terminal(object):
                 return self.cd(args)
             elif command=='ls':
                 return self.ls(args)
-        except Exception as CommandReturnError:
-            return(str(CommandReturnError))
+            elif command=='touch':
+                return self.touch(args)
+        except Exception as errorInApp:
+            return(str(errorInApp))
         
         return("Command not found")
     
