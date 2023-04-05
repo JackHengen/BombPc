@@ -74,68 +74,100 @@ class Terminal(object):
     def __init__(self,pc):
         self.pc=pc
         self.cwd=pc.files.home
-        self.inputText=""
 
     def ls(self,args):
+
+
+        searchHidden=False
+        if args==None:
+            paths=[]
+            optArgs=[]
+        else:
+            paths, optArgs = args
+            for optArg in optArgs:
+                if optArg=="-a":
+                    searchHidden=True
+                else:
+                    raise Exception("Optional Arguements are not valid for ls")
+            
+        
         folderContents=""
         lscwd=self.cwd
-        searchHidden=False
 
-        if len(args)>0:
-            if args[0][0:2] =="~/":#Starting from home
-                path = args[0][2:]
-            else:
-                path=args[0]#starting from cwd
+        if len(paths)>0:
+            for path in paths: 
+                if path[0:2] =="~/":#Starting from home
+                    self.cwd=self.pc.files.home
 
-            lsterm = Terminal(self.pc)#seperate terminal so we don't change this terminals cwd
-            lsterm.cwd = self.cwd
-            lsterm.cd([path])
-            lscwd=lsterm.cwd
+                lsterm = Terminal(self.pc)#seperate terminal so we don't change this terminals cwd
+                lsterm.cwd = self.cwd
+                lsterm.cd(([path],[]))
+                lscwd=lsterm.cwd
 
-            #process optional args
-            if len(args)>1:
-                for arg in args[1:]:
-                    if arg[0]=="-":
-                        pass
+                folderContents+=lsterm.cwd.name +":\n"
+                for child in lscwd.children: 
+                    if isinstance(child,Folder):         #different ways to get printable names for Folders and Children
+                                if child.name[0]==".":
+                                    if searchHidden:         
+                                        folderContents +=child.name + " "
+                                else:
+                                    folderContents +=child.name + " "
                     else:
-                        raise Exception("That is not a correct argument")
-
-        #different ways to get printable names for Folders and Children
-        for child in lscwd.children:
-            if isinstance(child,Folder):
                         if child.name[0]==".":
-                            if searchHidden:         
-                                folderContents +=child.name + " "
+                                    if searchHidden:         
+                                        folderContents +=child.displayName + " "
                         else:
-                            folderContents +=child.name + " "
-            else:
-                if child.name[0]==".":
-                            if searchHidden:         
-                                folderContents +=child.displayName + " "
+                            folderContents +=child.displayName + " "
+                if path != paths[-1]:
+                    folderContents+="\n\n"
+                    
+        else:
+            for child in lscwd.children: 
+                if isinstance(child,Folder):         #different ways to get printable names for Folders and Children
+                            if child.name[0]==".":
+                                if searchHidden:         
+                                    folderContents +=child.name + " "
+                            else:
+                                folderContents +=child.name + " "
                 else:
-                    folderContents +=child.displayName + " "
+                    if child.name[0]==".":
+                                if searchHidden:         
+                                    folderContents +=child.displayName + " "
+                    else:
+                        folderContents +=child.displayName + " "
+        
 
         return folderContents
     
 
     def cd(self,args):
-        if len(args)>1:
-            for arg in args[1:]:
-                if arg[0]=="-":
-                    pass
-                else:
-                    raise Exception("That is not a correct argument")
-        if args==[] or args[0][0]=="~":#Throws error if we evaluate args[0][0] if they don't exist, unless we don't evaluate because we end if early
-            self.cwd=self.pc.files.home
+
+        if args==None:
+            mainArgs=[]
+            optArgs=[]
         else:
-            path=args[0]
+            mainArgs, optArgs = args
+        
+        if mainArgs==[]:
+            self.cwd=self.pc.files.home
+            return
+
+        for optArg in optArgs:
+            raise Exception("Cd does not take any optinal arguments")
+        if len(mainArgs)>1:
+            raise Exception("Cd only takes in one main argument: path")
+        
+        path=mainArgs[0]
+
+        if path[0]=="~":
+            self.cwd=self.pc.files.home
+            path=path.split("/")
+            self._innercd(path[1:])
+        else:
             path=path.split("/")
             self._innercd(path)
         
-
-
-
-    def _innercd(self,path):
+    def _innercd(self,path):#TODO fake terminal so we don't mess up real terminal when cding
         if path ==[]:#Base case, we went through each part of the path
             return
         if path[0]=="..":
@@ -151,40 +183,86 @@ class Terminal(object):
         raise Exception("No such directory")
     
 
-
-
     def touch(self,args):
-        if len(args)>1:
-            for arg in args[1:]:
-                if arg[0]=="-":
-                    pass
-                else:
-                    raise Exception("That is not a correct argument")
-        lastPeriod=arg.rfind(".")
-        self.cwd.addFile(File(arg[:lastPeriod],arg[lastPeriod+1:]))
+        if args==None:
+            raise Exception("Touch requires argument: fileName")
+        else:
+            mainArgs, optArgs=args
+
+        for optArg in optArgs:
+            raise Exception("Touch does not take any optinal arguments")
+        
+        fileNames = mainArgs
+
+        cwdFilesStr=self.ls(None)
+
+        for fileName in fileNames:
+            if fileName in cwdFilesStr:
+                pass
+            else:
+                lastPeriod=fileName.rfind(".")   
+                if lastPeriod==-1:#no period in string
+                    self.cwd.addFile(File(fileName[:lastPeriod],""))
+                self.cwd.addFile(File(fileName[:lastPeriod],fileName[lastPeriod+1:]))
 
 
+    def mkDir(self,args):#TODO accept multiple path arguments
+        mainArgs, optArgs=args
+        for arg in optArgs:
+            raise Exception("mkDir takes in no arguments")
+        
+        for path in mainArgs:
+            path =path.split("/")
+            directoryName=path[-1]
+            path =path[:-1] # if theres one element then []
+            
+            mkterm = Terminal(self.pc)#seperate terminal so we don't change this terminals cwd
+            mkterm.cwd = self.cwd
+            if path!=[]:
+                mkterm.cd((path,[]))
+            mkcwd=mkterm.cwd
 
-    def mkDir(self,args):
-        pass
+            for child in mkcwd.children:
+                if isinstance(child,Folder):
+                    if child.name==directoryName:
+                        raise Exception("Folder already exists")
+                    
+            mkcwd.addFolder(directoryName)
+
 
 
 
 
     def rmDir(self,args):
-        if len(args)>1:
-            for arg in args[1:]:
-                if arg[0]=="-":
-                    pass
+        mainArgs, optArgs=args
+        for arg in optArgs:
+            raise Exception("rmDir takes in no arguments")
+        
+        for path in mainArgs:
+            path =path.split("/")
+            directoryName=path[-1]
+            path =path[:-1] # if theres one element then []
+            rmterm = Terminal(self.pc)#seperate terminal so we don't change this terminals cwd
+            rmterm.cwd = self.cwd
+
+            if path!=[]:
+                try:
+                    path="/".join(path)
+                    rmterm.cd(([path],[]))
+                except:
+                    raise Exception("No such file or Directory")
+                
+            rmcwd=rmterm.cwd
+
+            for index,child in enumerate(rmcwd.children):
+                if directoryName == child.name:
+                    rmcwd.children.remove(child)
+                    break
                 else:
-                    raise Exception("That is not a correct argument")
-        for child in self.cwd.children:
-            if isinstance(child,Folder):
-                if child.name==args[0]:
-                    self.cwd.children.remove(child)
-            else:
-                pass
-        raise Exception("No such directory")
+                    if index==len(rmcwd.children)-1:
+                        raise Exception("No such directory")
+
+
 
 
     
@@ -196,7 +274,7 @@ class Terminal(object):
 
 
 
-    def parseCommand(self,input):#TODO TODO TODO process optional args so it can pass through [main arg,[optional args]]
+    def parseCommand(self,input):
         try:
             input =input.split(' ')
             command = input[0]
@@ -204,13 +282,31 @@ class Terminal(object):
             return("No Command Entered")
         
         args = input[1:]
+        optionalArgs=[]
+        mainArgs=[]
+
+        for arg in args:
+            if arg[0]=="-":
+                optionalArgs.append(arg)
+            else:
+                mainArgs.append(arg)
+        if mainArgs==[] and optionalArgs==[]:
+            formattedArgs=None
+        else:
+            formattedArgs=(mainArgs,optionalArgs)
+
         try:
             if command=='cd':
-                return self.cd(args)
+                return self.cd(formattedArgs)
             elif command=='ls':
-                return self.ls(args)
+                return self.ls(formattedArgs)
             elif command=='touch':
-                return self.touch(args)
+                return self.touch(formattedArgs)
+            elif command=='mkdir':
+                return self.mkDir(formattedArgs)
+            elif command=="rmdir":
+                return self.rmDir(formattedArgs)
+            
         except Exception as errorInApp:
             return(str(errorInApp))
         
@@ -226,6 +322,3 @@ if __name__ == "__main__":
         result=term.parseCommand(input())
         if result!=None:
             print(result)
-#TODO fake cwd for cding and for both fake cwds if some wrong path is there then return an error or something
-#^^Maybe deep clone current terminal and then just cd and then return a value for the other things im gonna add next
-#TODO change the getPrompt to be handled by the UI
