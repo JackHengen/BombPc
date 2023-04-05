@@ -134,6 +134,7 @@ class Terminal(object):
         
 
 
+
     def _innercd(self,path):
         if path ==[]:#Base case, we went through each part of the path
             return
@@ -149,6 +150,7 @@ class Terminal(object):
                 pass #child is a file
         raise Exception("No such directory")
     
+
 
 
     def touch(self,args):
@@ -193,7 +195,7 @@ class Terminal(object):
 
 
 
-    
+
     def parseCommand(self,input):#TODO TODO TODO process optional args so it can pass through [main arg,[optional args]]
         try:
             input =input.split(' ')
